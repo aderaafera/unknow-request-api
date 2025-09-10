@@ -1,4 +1,4 @@
-import { defineEventHandler, getRequestURL, getHeader, sendRedirect, readBody, setResponseHeader } from "h3";
+import { defineEventHandler, getRequestURL, getHeader, sendRedirect, setResponseHeader } from "h3";
 
 export default defineEventHandler(async (event) => {
   const url = getRequestURL(event);
@@ -26,11 +26,16 @@ export default defineEventHandler(async (event) => {
     // Ignore errors; redirect regardless
   }
 
-  // Decide redirect target: prefer referrer; else, same URL without username
-  let redirectTarget = referrer;
+  // Decide redirect target: prefer explicit redirect query (PUBLIC_RETURN_PARAM), then referrer; else, same URL without username
+  const publicConfig = useRuntimeConfig(event).public;
+  const returnParam = publicConfig?.returnParam || "redirect";
+  const redirectFromQuery = url.searchParams.get(returnParam) || "";
+
+  let redirectTarget = redirectFromQuery || referrer;
   if (!redirectTarget) {
     const newUrl = new URL(url.toString());
     newUrl.searchParams.delete("username");
+    if (returnParam) newUrl.searchParams.delete(returnParam);
     redirectTarget = newUrl.toString();
   }
 

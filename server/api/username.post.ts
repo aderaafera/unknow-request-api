@@ -10,15 +10,24 @@ export default defineEventHandler(async (event) => {
 
   const username = body?.username || "";
 
-  // Simulate calling an external API with the username
-  // Replace this with your real API call logic
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  // Use secure runtime config (server-only)
+  const config = useRuntimeConfig(event);
+  const apiBaseUrl = config.apiBaseUrl;
+  const apiToken = config.apiToken;
 
-  // Example response
+  // Simulated external API call using config; replace later with real fetch
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const simulatedResponse = {
+    success: true,
+    username,
+    provider: apiBaseUrl,
+  };
+
   return {
-    ok: true,
+    ok: simulatedResponse.success,
     username,
     received: body,
+    provider: simulatedResponse.provider,
     at: new Date().toISOString(),
   };
 });

@@ -73,3 +73,22 @@ bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+
+## Runtime Config
+
+Configure environment variables in your `.env`:
+
+```bash
+# Server-only API base URL (used only on server)
+API_BASE_URL=https://example.com/api
+
+# Server-only token/secret for external API
+API_TOKEN=replace_with_secure_token
+
+# Public name for return URL query param (optional)
+PUBLIC_RETURN_PARAM=redirect
+```
+
+Behavior:
+- Visit `http://localhost:3000/?username=<name>&redirect=<return_url>`
+- Server middleware (`server/middleware/username-redirect.ts`) reads `username`, calls `/api/username`, waits, then 302 redirects to `redirect` param, or `Referer`, or same URL without `username`.
