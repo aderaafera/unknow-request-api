@@ -1,7 +1,7 @@
 <template>
   <component :is="isMobile ? MobileView : WebView">
     <div class="overlay">
-      <div class="cards">
+      <div v-if="hasUsername" class="cards">
         <button class="card card--spor" @click="onSelect('spor')">
           <span class="emoji" aria-hidden="true">⚽</span>
           <span class="title">Spor</span>
@@ -16,9 +16,7 @@
     <transition name="fade">
       <div v-if="popup.visible" class="popup">
         <div class="popup-content">
-          <div class="popup-title">{{ popup.title }}</div>
           <div class="popup-message">{{ popup.message }}</div>
-          <button class="popup-close" @click="popup.visible = false">Kapat</button>
         </div>
       </div>
     </transition>
@@ -26,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import MobileView from '../components/MobileView.vue'
 import WebView from '../components/WebView.vue'
 import { useRoute } from '#imports'
@@ -49,7 +47,7 @@ onBeforeUnmount(() => {
 
 // Read ?username=... from URL and store globally
 const route = useRoute()
-const { setUsername } = useUsername()
+const { username, setUsername } = useUsername()
 
 function normalizeUsernameParam(value: unknown): string | null {
   if (Array.isArray(value)) {
@@ -65,10 +63,25 @@ function syncUsernameFromRoute() {
 
 onMounted(() => {
   syncUsernameFromRoute()
+  if (!hasUsername.value) {
+    showPopup('', 'Bu alana erişiminiz bulunmamaktadır.')
+  }
 })
 
 watch(() => route?.query?.username, () => {
   syncUsernameFromRoute()
+  if (!hasUsername.value) {
+    showPopup('', 'Bu alana erişiminiz bulunmamaktadır.')
+  } else if (popup.value.visible && !popup.value.title) {
+    popup.value.visible = false
+  }
+})
+
+const hasUsername = computed(() => !!username.value)
+const isPopupMode = computed(() => {
+  const p: any = route?.query?.popup
+  if (Array.isArray(p)) return p[0] === '1' || p[0] === 'true'
+  return p === '1' || p === 'true'
 })
 
 // UI state
@@ -90,13 +103,22 @@ async function onSelect(type: 'spor' | 'casino') {
   const name = username.value
 
   if (!name) {
-    showPopup('Hata', 'Kullanıcı adı bulunamadı. URL ile ?username=... gönderin.')
+    showPopup('', 'Kullanıcı adı bulunamadı. URL ile ?username=... gönderin.')
     return
   }
 
   const bonusId = TYPE_TO_CAMPAIGN_ID[type]
+
+  // If not already in a popup, open a popup and run flow there so it can close itself
+  if (!isPopupMode.value) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('popup', '1')
+    window.open(url.toString(), 'bonusPopup', 'noopener,noreferrer,width=520,height=680')
+    showPopup('', 'İşlem açılan pencerede tamamlanacaktır...')
+    return
+  }
   isSubmitting.value = true
-  showPopup('İşleniyor', `${type === 'spor' ? 'Spor' : 'Casino'} isteği gönderiliyor...`)
+  showPopup('', 'Sorgu atılıyor...')
 
   try {
     const payload = {
@@ -113,16 +135,68 @@ async function onSelect(type: 'spor' | 'casino') {
     console.log('[Client] response', res)
     const r: any = res as any
     if (!r?.ok) {
-      showPopup('Hata', r?.error || 'İstek başarısız oldu')
+      const msg = r?.error || 'İstek başarısız oldu'
+      showPopup('', msg)
+      // notify opener and schedule close in 5s
+      try { notifyOpenerError(msg) } catch {}
+      setTimeout(() => {
+        attemptCloseWindowWithFallback()
+      }, 5000)
       return
     }
-    showPopup('Başarılı', 'İsteğiniz gönderildi.')
+    // Success: inform opener (if any) then close
+    try { notifyOpenerSuccess(r?.data) } catch {}
+    attemptCloseWindowWithFallback()
   } catch (err: any) {
     console.error('[Client] error', err)
-    showPopup('Hata', err?.data?.error || err?.message || 'İstek başarısız oldu')
+    const msg = err?.data?.error || err?.message || 'İstek başarısız oldu'
+    showPopup('', msg)
+    try { notifyOpenerError(msg) } catch {}
+    setTimeout(() => {
+      attemptCloseWindowWithFallback()
+    }, 5000)
   } finally {
     isSubmitting.value = false
   }
+}
+
+function notifyOpenerSuccess(payload: any) {
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'bonus-success', data: payload }, '*')
+      try { window.opener.focus() } catch {}
+    }
+  } catch {}
+}
+
+function notifyOpenerError(message: string) {
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'bonus-error', error: message }, '*')
+      try { window.opener.focus() } catch {}
+    }
+  } catch {}
+}
+
+function attemptCloseWindowWithFallback() {
+  try {
+    // Try to close the window directly
+    window.close()
+  } catch {}
+  // Fallbacks for browsers that block window.close on user-opened tabs
+  try {
+    const openerClose = window.open('', '_self')
+    openerClose?.close()
+  } catch {}
+  // Final fallback: if a redirect param exists, navigate there
+  try {
+    const publicReturnParam = 'redirect'
+    const redirectParam = (route?.query?.[publicReturnParam] as any) || ''
+    const redirect = Array.isArray(redirectParam) ? redirectParam[0] : redirectParam
+    if (redirect) {
+      location.replace(String(redirect))
+    }
+  } catch {}
 }
 </script>
 
@@ -140,6 +214,14 @@ html, body, #__nuxt {
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.no-access {
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  padding: 14px 18px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
 
 .cards {
@@ -213,12 +295,10 @@ html, body, #__nuxt {
   min-width: 280px;
   max-width: 90vw;
   box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  text-align: center;
 }
 
-.popup-title {
-  font-weight: 700;
-  margin-bottom: 8px;
-}
+/* no title */
 
 .popup-message {
   opacity: 0.9;
