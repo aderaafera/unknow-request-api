@@ -7,6 +7,11 @@ export default defineEventHandler(async (event) => {
     return;
   }
 
+  // Only run this middleware on a dedicated path, avoid hijacking home page with query params
+  if (url.pathname !== "/redirect") {
+    return;
+  }
+
   // Capture referrer from header if any
   const referrer = getHeader(event, "referer") || getHeader(event, "referrer") || "";
 
