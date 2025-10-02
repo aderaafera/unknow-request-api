@@ -17,6 +17,7 @@
       <div v-if="popup.visible" class="popup">
         <div class="popup-content">
           <div class="popup-message">{{ popup.message }}</div>
+          <a v-if="!isSubmitting" class="popup-link" href="https://t2m.io/poliwin">Siteye dön</a>
         </div>
       </div>
     </transition>
@@ -221,6 +222,7 @@ html, body, #__nuxt {
   width: 100%;
   height: 100%;
   margin: 0;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .overlay {
@@ -318,6 +320,17 @@ html, body, #__nuxt {
 
 .popup-message {
   opacity: 0.9;
+}
+
+.popup-link {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #2dcc70;
+  color: #0b1113;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .popup-close {
