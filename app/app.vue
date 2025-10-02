@@ -108,15 +108,6 @@ async function onSelect(type: 'spor' | 'casino') {
   }
 
   const bonusId = TYPE_TO_CAMPAIGN_ID[type]
-
-  // If not already in a popup, open a popup and run flow there so it can close itself
-  if (!isPopupMode.value) {
-    const url = new URL(window.location.href)
-    url.searchParams.set('popup', '1')
-    window.open(url.toString(), 'bonusPopup', 'noopener,noreferrer,width=520,height=680')
-    showPopup('', 'İşlem açılan pencerede tamamlanacaktır...')
-    return
-  }
   isSubmitting.value = true
   showPopup('', 'Sorgu atılıyor...')
 
@@ -126,13 +117,11 @@ async function onSelect(type: 'spor' | 'casino') {
       bonusId,
       campaignId: null
     }
-    console.log('[Client] sending payload', payload)
 
     const res = await $fetch('/api/bonus.request', {
       method: 'POST',
       body: payload
     })
-    console.log('[Client] response', res)
     const r: any = res as any
     if (!r?.ok) {
       const msg = r?.error || 'İstek başarısız oldu'
@@ -144,11 +133,14 @@ async function onSelect(type: 'spor' | 'casino') {
       }, 5000)
       return
     }
-    // Success: inform opener (if any) then close
+    // Success: show confirmation message briefly, then redirect/close
     try { notifyOpenerSuccess(r?.data) } catch {}
-    attemptCloseWindowWithFallback()
+    showPopup('', 'Talebiniz başarılı bir şekilde iletilmiştir, hesabınızı kontrol edebilirsiniz')
+    // After 2 seconds, redirect back or close
+    setTimeout(() => {
+      redirectBackToOpenerOrClose()
+    }, 2000)
   } catch (err: any) {
-    console.error('[Client] error', err)
     const msg = err?.data?.error || err?.message || 'İstek başarısız oldu'
     showPopup('', msg)
     try { notifyOpenerError(msg) } catch {}
@@ -197,6 +189,30 @@ function attemptCloseWindowWithFallback() {
       location.replace(String(redirect))
     }
   } catch {}
+}
+
+function redirectBackToOpenerOrClose() {
+  try {
+    // Prefer explicit redirect query param
+    const publicReturnParam = 'redirect'
+    const redirectParam = (route?.query?.[publicReturnParam] as any) || ''
+    const redirect = Array.isArray(redirectParam) ? redirectParam[0] : redirectParam
+    if (redirect) {
+      location.replace(String(redirect))
+      return
+    }
+  } catch {}
+
+  try {
+    // Next, try to go back to referrer
+    if (document.referrer) {
+      location.replace(document.referrer)
+      return
+    }
+  } catch {}
+
+  // As a last resort, close
+  attemptCloseWindowWithFallback()
 }
 </script>
 

@@ -45,13 +45,6 @@ export default defineEventHandler(async (event: H3Event) => {
       rec.count += 1
     }
 
-    // Server-side logs for debug
-    console.log('[BonusRequest] outbound body', {
-      username: body?.username,
-      bonusId: body?.bonusId,
-      campaignId: null,
-      ipAdress: clientIp
-    })
 
     const response = await $fetch(url, {
       method: 'POST',
@@ -69,12 +62,10 @@ export default defineEventHandler(async (event: H3Event) => {
       }
     })
 
-    console.log('[BonusRequest] response', response)
     return { ok: true, data: response }
   } catch (error: any) {
     const status = error?.status || error?.response?.status || 500
     const message = error?.data?.message || error?.data || error?.statusMessage || error?.message || 'Unknown error'
-    console.error('[BonusRequest] error', { status, message })
     // Always return 200 with structured error to avoid client fetch throwing as network error
     return { ok: false, error: message, status }
   }
