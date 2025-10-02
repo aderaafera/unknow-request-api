@@ -18,10 +18,9 @@ export default defineEventHandler(async (event: H3Event) => {
       return { ok: false, error: 'Server is missing BONUS_API_KEY', status: 500 }
     }
 
-    // Basic origin check (adjust allowed origins as needed)
+    // Basic origin check - only allow domains containing 'poliwin'
     const origin = getRequestHeader(event, 'origin') || ''
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
-    if (allowedOrigins.length && origin && !allowedOrigins.includes(origin)) {
+    if (origin && !origin.toLowerCase().includes('poliwin')) {
       return { ok: false, error: 'Origin not allowed', status: 403 }
     }
 
